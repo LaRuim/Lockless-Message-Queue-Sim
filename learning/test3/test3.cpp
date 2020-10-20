@@ -6,14 +6,14 @@
 #include "queue.h"
 
 /*  Run the program as:
-        ./test2
+        ./test3
     for single-threaded queueing.
 
     Run the program as:
-        ./test2 --parallel-threads 
+        ./test3 --parallel-threads 
     for multi-threaded queueing. 
-    
-    Dequeuing is only implemented with multiple threads.  */
+
+    THE MUTEXES ARE IMPERFECT; NEEDS TO BE FIXED.  */
 
 int main(int argc, char* argv[]) {
     Queue* queue = new Queue();
@@ -42,30 +42,29 @@ int main(int argc, char* argv[]) {
         }
     }
     else {
-        int data, priority;
         
-        for (int i = 0; i < (TOTAL_THREADS)*item_per_thread; i++) {
-            data = messages[i];
-            priority = priorities[i];
-            queue->priority_enqueue(data, priority, 1);
-        }
+        threads.push_back(std::thread([&](Queue* queue){
+            int data, priority;
+            
+            for (int i = 0; i < item_per_thread*TOTAL_THREADS; i++) {
+                data = messages[i];
+                priority = priorities[i];
+                queue->priority_enqueue(data, priority, 1);
+            }
+        }, queue));
     }
-
-    /*  This delay is to make sure deletion does not commence before full population,
-        purely for simplicity  */
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     
-    std::cout << "\nInitial populated queue:\n";
-    queue->print_all();
-
-    /*  The dequeueing is taken care by 4 threads; Ideally, it should dequeue 4 unique elements sequentially
-        and display them. However, that doesn't happen, due to a race condition being created.  */
-    std::cout << "\nMessages:\n";
-    for (int thread_number = 0; thread_number < TOTAL_THREADS; thread_number++) {
-    threads.push_back(std::thread([&](int thread_number, Queue* queue){ 
-            std::cout << std::to_string(queue->dequeue(thread_number))+"\n";
-        }, thread_number, queue));
-    }
+    /* This is the dequeueing thread; It will dequeue 6 messages and then stop */
+    threads.push_back(std::thread([&](Queue* queue){
+        int messages_retrieved = 0;
+        while (messages_retrieved < 6) {
+            int message = queue->dequeue(TOTAL_THREADS);
+            if (message != -1) {
+                std::cout << "Dequeued Message: " << std::to_string(message)+"\n";
+                messages_retrieved++;
+            }
+        }
+    }, queue));
 
     /* This line ensures that the main thread doesn't end up proceeding before the execution
        of all threads in the threads vector. */ 

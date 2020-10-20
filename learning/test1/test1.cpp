@@ -13,7 +13,7 @@ void race(int* generic_shared_variable, int thread_number)  {
     }
 }
  
-int main() {
+int main(void) {
     int* generic_shared_variable = new int(0);
 
     std::vector<std::thread> threads;

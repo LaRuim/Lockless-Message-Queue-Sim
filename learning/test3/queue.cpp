@@ -3,7 +3,11 @@
 #include <chrono>
 #include <iostream>
 #include <thread>
+#include <mutex>
 #include "queue.h"
+
+std::mutex Mutex;
+std::mutex DelMutex;
 
 /* CONSTRUCTORS */
 
@@ -25,51 +29,55 @@ Queue::Queue() {
 
 // The visible enqueue function;
 int Queue::priority_enqueue(int data, int priority, int thread_number) {
-
-    if (!get_size()) {
+    Mutex.lock();
+    int size = get_size();
+    if (!size) {
         std::this_thread::sleep_for(std::chrono::milliseconds((TOTAL_THREADS-thread_number-1)*50));
-        std::cout << "Appending " + std::to_string(priority) + ". " + std::to_string(data) + " by thread " + std::to_string(thread_number) + "\n";
         append(data, priority);
+        Mutex.unlock();
+        std::cout << "Appending " + std::to_string(priority) + ". " + std::to_string(data) + " by thread " + std::to_string(thread_number) + "\n";
         return 1;
     }
 
     else {
         Node* iterator = get_head();
         int current_priority;
-
+        std::this_thread::sleep_for(std::chrono::milliseconds((TOTAL_THREADS-thread_number-1)*50));   
         while (iterator != nullptr) {
             current_priority = iterator->get_priority();
             if (priority < current_priority) {
-                std::this_thread::sleep_for(std::chrono::milliseconds((TOTAL_THREADS-thread_number-1)*150));   
-                std::cout << "Enqueueing " + std::to_string(priority) + ". " + std::to_string(data) + " by thread " + std::to_string(thread_number) + "\n";
                 insert_before(iterator, data, priority);
+                std::cout << "Enqueueing " + std::to_string(priority) + ". " + std::to_string(data) + " by thread " + std::to_string(thread_number) + "\n";
+                Mutex.unlock();
                 return 1;
             }
             iterator = iterator->get_next_node();
         }
+        std::cout << "Appending " + std::to_string(priority) + ". " + std::to_string(data) + " by thread " + std::to_string(thread_number) + "\n";
         append(data, priority);
     }
-    
+    Mutex.unlock();
     return 0;
 }
 
 // The visible dequeue function
 int Queue::dequeue(int thread_number) {
+    srand(time(0));
+    DelMutex.lock();
     int peek_value = peek_priority();
-    std::this_thread::sleep_for(std::chrono::milliseconds((TOTAL_THREADS-thread_number-1)*50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(rand()%250));
+    //std::this_thread::sleep_for(std::chrono::milliseconds((TOTAL_THREADS-thread_number-1)*50));
     if (peek_value != -1) {
         Node* hold = get_head();
-
-        // std::this_thread::sleep_for(std::chrono::milliseconds((TOTAL_THREADS-thread_number-1)*50));
-        
-        /*  The above causes a double-free error; One thread tries to free an already freed location.
-            This is probably the best demonstration of there being a race condition, but 
-            it's commented out as it throws an error. To try it out, uncomment the above
-            line and comment out the initial delay in the function, right outside the if block.  */
+        std::this_thread::sleep_for(std::chrono::milliseconds(rand()%250));
             
         set_head(hold->get_next_node());
+        DelMutex.unlock();
         delete(hold);
         size--;
+    }
+    else {
+        DelMutex.unlock();
     }
     return peek_value;
 }
@@ -113,22 +121,25 @@ int Queue::insert_before(Node* where, int data, int priority){
 
 // Print all contents of the queue;
 int Queue::print_all() {
-    if (!get_size()) {
+    int size = get_size();
+    if (!size) {
         std::cout << "Empty.\n";
-        std::cout << "Size: " << get_size() << '\n';
+        std::cout << "Size: " << size << '\n';
         return 1;
     }
-    else if (get_size() == 1){
-        std::cout << peek_priority() << ". " << peek_data() << "\nSize: " << get_size() << "\n";
+    else if (size == 1){
+        std::cout << peek_priority() << ". " << peek_data() << "\nSize: " << size << "\n";
         return 1;
     }
-    else if (get_size() > 1){
+    else if (size > 1){
         Node* iterator = get_head();
-        while (iterator){
+        int index = 0;
+        while (iterator && index < size){
             std::cout << iterator->get_priority() << ". " << iterator->get_data() << '\n';
             iterator = iterator->get_next_node();
+            index++;
         }
-        std::cout << "\nSize: " << get_size() << "\n";
+        std::cout << "\nSize: " << size << "\n";
         return 1;
     }
     else{
