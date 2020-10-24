@@ -4,10 +4,8 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include "queue.h"
-
-std::mutex Mutex;
-std::mutex DelMutex;
 
 /* CONSTRUCTORS */
 
@@ -19,6 +17,7 @@ Node::Node(int data, int priority, Node* previous_node, Node* next_node){
 }
 
 Queue::Queue() {
+    
     head = NULL;
     tail = NULL;
     size = 0;
@@ -29,26 +28,34 @@ Queue::Queue() {
 
 // The visible enqueue function;
 int Queue::priority_enqueue(int data, int priority, int thread_number) {
-    Mutex.lock();
+    srand(time(0));
+    std::unique_lock<std::mutex> Lock(Mutex);
+    //Mutex.lock();
+    Condition.wait(Lock, [this]{return !this->in_use;});
+    in_use = true;
     int size = get_size();
     if (!size) {
-        std::this_thread::sleep_for(std::chrono::milliseconds((TOTAL_THREADS-thread_number-1)*50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(rand()%250));
         append(data, priority);
-        Mutex.unlock();
         std::cout << "Appending " + std::to_string(priority) + ". " + std::to_string(data) + " by thread " + std::to_string(thread_number) + "\n";
+        in_use = false;
+        Condition.notify_one();
+        //Mutex.unlock();
         return 1;
     }
 
     else {
         Node* iterator = get_head();
         int current_priority;
-        std::this_thread::sleep_for(std::chrono::milliseconds((TOTAL_THREADS-thread_number-1)*50));   
+        std::this_thread::sleep_for(std::chrono::milliseconds(rand()%250));   
         while (iterator != nullptr) {
             current_priority = iterator->get_priority();
             if (priority < current_priority) {
                 insert_before(iterator, data, priority);
                 std::cout << "Enqueueing " + std::to_string(priority) + ". " + std::to_string(data) + " by thread " + std::to_string(thread_number) + "\n";
-                Mutex.unlock();
+                in_use = false;
+                Condition.notify_one();
+                //Mutex.unlock();
                 return 1;
             }
             iterator = iterator->get_next_node();
@@ -56,29 +63,33 @@ int Queue::priority_enqueue(int data, int priority, int thread_number) {
         std::cout << "Appending " + std::to_string(priority) + ". " + std::to_string(data) + " by thread " + std::to_string(thread_number) + "\n";
         append(data, priority);
     }
-    Mutex.unlock();
+    in_use = false;
+    Condition.notify_one();
+    //Mutex.unlock();
     return 0;
 }
 
 // The visible dequeue function
 int Queue::dequeue(int thread_number) {
     srand(time(0));
-    DelMutex.lock();
+    std::unique_lock<std::mutex> Lock(Mutex);
+    //Mutex.lock();
+    Condition.wait(Lock, [this]{return !this->in_use;});
+    in_use = true;
     int peek_value = peek_priority();
     std::this_thread::sleep_for(std::chrono::milliseconds(rand()%250));
-    //std::this_thread::sleep_for(std::chrono::milliseconds((TOTAL_THREADS-thread_number-1)*50));
+    //std::this_thread::sleep_for(std::chrono::milliseconds(rand()%250));
     if (peek_value != -1) {
         Node* hold = get_head();
         std::this_thread::sleep_for(std::chrono::milliseconds(rand()%250));
             
         set_head(hold->get_next_node());
-        DelMutex.unlock();
-        delete(hold);
         size--;
+        delete(hold);
     }
-    else {
-        DelMutex.unlock();
-    }
+    in_use = false;
+    Condition.notify_one();
+    //Mutex.unlock();
     return peek_value;
 }
 
@@ -208,4 +219,8 @@ int Queue::set_head(Node* new_head) {
 int Queue::set_tail(Node* new_tail) {
     tail = new_tail;
     return 1;
+}
+
+bool Queue::is_not_in_use() {
+    return !in_use;
 }

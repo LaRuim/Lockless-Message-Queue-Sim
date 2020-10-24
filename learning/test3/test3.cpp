@@ -3,6 +3,8 @@
 #include <vector>
 #include <chrono>
 #include <string>
+#include <mutex>
+#include <condition_variable>
 #include "queue.h"
 
 /*  Run the program as:
@@ -11,12 +13,11 @@
 
     Run the program as:
         ./test3 --parallel-threads 
-    for multi-threaded queueing. 
-
-    THE MUTEXES ARE IMPERFECT; NEEDS TO BE FIXED.  */
+    for multi-threaded queueing.  */
 
 int main(int argc, char* argv[]) {
     Queue* queue = new Queue();
+    
     int messages[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
     int priorities[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 
@@ -71,7 +72,7 @@ int main(int argc, char* argv[]) {
     for (auto &thread: threads) {
         thread.join();
     }
-
+    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
     std::cout << "\nStill in Queue after messages are removed:\n";
     queue->print_all();
     return 1;

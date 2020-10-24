@@ -3,6 +3,7 @@ class Node {
     int priority;
     Node* next_node;
     Node* previous_node;
+
     public:
         Node(int data, int priority, Node* previous_node, Node* next_node);
         int get_data();
@@ -14,6 +15,10 @@ class Node {
 };
 
 class Queue {
+    bool in_use;
+    std::mutex Mutex; 
+    std::condition_variable Condition;
+    
     Node* head;
     Node* tail;
     int size;
@@ -22,6 +27,7 @@ class Queue {
     int set_head(Node* new_head);
     int set_tail(Node* new_tail);
     int insert_before(Node* where, int data, int priority);
+
     public:
         Queue();
         int get_size();
@@ -31,6 +37,7 @@ class Queue {
         int append(int data, int priority);
         int dequeue(int thread_number);
         int print_all();
+        bool is_not_in_use();
 };
 
 const int TOTAL_THREADS = 4;
