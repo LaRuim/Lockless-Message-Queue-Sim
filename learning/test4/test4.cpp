@@ -20,35 +20,21 @@ std::vector <std::deque <std::string>> all_messages = {{"Zero" ,"One",
                                 {"Twelve", "Thirteen", "Fourteen", "Fifteen"}};
 std::vector <std::deque <int>> all_priorities = {{0,1,2,3},{4,5,6,7},{8,9,10,11},
                                                 {12,13,14,15}};
-
-std::mutex thread_creation; 
-std::condition_variable creating_thread;
-int job_threads_created = 0;
-
+    
 void Queue::enqueue_job(int thread_number) {
     std::deque <std::string> messages = all_messages[thread_number];
     std::deque <int> priorities = all_priorities[thread_number];
-    
-    bool has_created = false;
+
     while (!messages.empty()) {
-        if (!has_created) {
-            std::unique_lock<std::mutex> Create(thread_creation);
-            job_threads_created++;
-            has_created = true;
-        }
-        else if (job_threads_created == TOTAL_THREADS) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(rand()%250));
-            std::unique_lock<std::mutex> Lock(Mutex);
-            Condition.wait(Lock, [this]{return !this->in_use;});
-            priority_enqueue(messages.front(), priorities.front(), thread_number+1);
-            messages.pop_front();
-            priorities.pop_front();
-            Condition.notify_one();
-        }
-        else {
-            continue;
-        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(rand()%250));
+        std::unique_lock<std::mutex> Lock(Mutex);
+        Condition.wait(Lock, [this]{return !this->in_use;});
+        priority_enqueue(messages.front(), priorities.front(), thread_number+1);
+        messages.pop_front();
+        priorities.pop_front();
+        Condition.notify_all();
     }
+    
 }
 
 int main(int argc, char* argv[]) {
@@ -58,6 +44,7 @@ int main(int argc, char* argv[]) {
     for (int thread_number = 0; thread_number < TOTAL_THREADS; thread_number++) {
         thread_pool.push_back(std::thread([&](int thread_number, Queue* queue){
             queue->enqueue_job(thread_number);
+            std::cout << "Thread " << thread_number+1 << " enqueued!\n";
         }, thread_number, queue));
     }
         
@@ -68,18 +55,17 @@ int main(int argc, char* argv[]) {
             std::unique_lock<std::mutex> Lock(queue->Mutex);
             queue->Condition.wait(Lock, [queue]{return !queue->in_use;});
             if (!queue->get_size()) {
-                queue->Condition.notify_one();
-                continue;
-            }
-            std::string message = queue->dequeue(TOTAL_THREADS);
-            if (message != "-1") {
-                messages_retrieved++;
+                queue->Condition.notify_all();
+                std::this_thread::yield;
             }
             else {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                std::this_thread::yield; // This does not seem to be fulfilling the purpose of sending the thread r
+                std::string message = queue->dequeue(TOTAL_THREADS);
+                if (message != "-1") {
+                    messages_retrieved++;
+                }
+                queue->Condition.notify_one();   
+                std::this_thread::yield;
             }
-            queue->Condition.notify_one();
         }
     }, queue));
 
