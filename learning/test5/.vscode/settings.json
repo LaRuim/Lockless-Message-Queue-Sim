@@ -1,6 +1,5 @@
 {
     "files.associations": {
-        "thread": "cpp",
         "cctype": "cpp",
         "clocale": "cpp",
         "cmath": "cpp",
@@ -49,6 +48,7 @@
         "sstream": "cpp",
         "stdexcept": "cpp",
         "streambuf": "cpp",
+        "thread": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp"
     }
